@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "arista-mcp-server"
+version = "1.0.0"
+description = "MCP server for Arista EOS switch management"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "clearminds"}]
+keywords = ["mcp", "arista", "eos", "eapi", "network"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+    "httpx>=0.28.1",
+    "fastmcp>=2.14.0,<3",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "paramiko>=3.0",
+]
+
+[project.urls]
+Repository = "https://github.com/clearminds/arista-mcp-server"
+
+[project.scripts]
+arista-mcp-server = "arista_mcp_server.server:main"
