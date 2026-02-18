@@ -12,7 +12,27 @@ uvx arista-mcp-server
 
 ## Configuration
 
-Configuration via environment variables. See `--help` for all options:
+**Preferred:** Configuration file at `~/.config/arista/credentials.json` (chmod 600):
+
+```json
+{
+  "username": "admin",
+  "password": "your-password",
+  "ssh_key": "/path/to/id_rsa"
+}
+```
+
+**Note:** Either password or ssh_key is required, not both.
+
+**Alternative:** Environment variables are also supported:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `ARISTA_USERNAME` | Arista username | `admin` |
+| `ARISTA_PASSWORD` | Arista password | `your-password` |
+| `ARISTA_SSH_KEY` | SSH key path | `/path/to/id_rsa` |
+
+See `--help` for additional options:
 
 ```bash
 arista-mcp-server --help
