@@ -1,0 +1,3 @@
+site_name: clr-arista-mcp
+nav:
+  - Overview: index.md

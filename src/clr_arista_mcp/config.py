@@ -13,11 +13,11 @@ CREDS_PATH = Path.home() / ".config" / "arista" / "credentials.json"
 
 
 class Settings(BaseSettings):
-    """Settings loaded from environment variables or credentials file.
+    """Settings loaded from credentials file or environment variables.
 
     Priority order:
-    1. Environment variables (ARISTA_USERNAME, ARISTA_PASSWORD, ARISTA_SSH_KEY)
-    2. ~/.config/arista/credentials.json
+    1. ~/.config/arista/credentials.json
+    2. Environment variables (ARISTA_USERNAME, ARISTA_PASSWORD, ARISTA_SSH_KEY) - override
     """
 
     arista_username: str = ""
@@ -29,14 +29,14 @@ class Settings(BaseSettings):
     model_config = {"env_prefix": ""}
 
     def load_credentials(self) -> dict[str, Any]:
-        """Load credentials with env-first, config-file-fallback pattern.
+        """Load credentials with config-file-first, env-override pattern.
 
         Returns:
             Dict with username, password, and optional ssh_key.
         """
         creds: dict[str, Any] = {}
 
-        # 1. FIRST: Check environment variables
+        # 1. FIRST: Load from environment variables (base/fallback)
         if self.arista_username:
             creds["username"] = self.arista_username
         if self.arista_password:
@@ -44,22 +44,16 @@ class Settings(BaseSettings):
         if self.arista_ssh_key:
             creds["ssh_key"] = self.arista_ssh_key
 
-        # If we have username and (password or ssh_key) from env, return early
-        if creds.get("username") and (creds.get("password") or creds.get("ssh_key")):
-            logger.info("Using Arista credentials from environment variables")
-            return creds
-
-        # 2. FALLBACK: Check credentials.json file
+        # 2. THEN: Override with credentials.json file (takes priority)
         if CREDS_PATH.exists():
             try:
                 file_creds: dict[str, Any] = json.loads(CREDS_PATH.read_text())
 
-                # Only use file values if NOT already set by env vars
-                if "username" in file_creds and not creds.get("username"):
+                if "username" in file_creds:
                     creds["username"] = file_creds["username"]
-                if "password" in file_creds and not creds.get("password"):
+                if "password" in file_creds:
                     creds["password"] = file_creds["password"]
-                if "ssh_key" in file_creds and not creds.get("ssh_key"):
+                if "ssh_key" in file_creds:
                     creds["ssh_key"] = file_creds["ssh_key"]
 
                 logger.info(f"Loaded Arista credentials from {CREDS_PATH}")
