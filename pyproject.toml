@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "arista-mcp-server"
+name = "clr-arista-mcp"
 version = "1.0.0"
 description = "MCP server for Arista EOS switch management"
 requires-python = ">=3.11"
@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/clearminds/arista-mcp-server"
+Repository = "https://github.com/clearminds/clr-arista-mcp"
 
 [project.scripts]
-arista-mcp-server = "arista_mcp_server.server:main"
+clr-arista-mcp = "clr_arista_mcp.server:main"

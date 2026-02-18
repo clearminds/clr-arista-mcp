@@ -8,8 +8,8 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from arista_mcp_server.config import Settings
-from arista_mcp_server.eos_client import EOSClient
+from clr_arista_mcp.config import Settings
+from clr_arista_mcp.eos_client import EOSClient
 
 mcp = FastMCP("Arista")
 _client: EOSClient | None = None

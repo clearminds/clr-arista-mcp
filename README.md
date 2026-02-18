@@ -1,13 +1,13 @@
-# arista-mcp-server
+# clr-arista-mcp
 
 Arista EOS switch management via eAPI
 
 ## Install
 
 ```bash
-pip install arista-mcp-server
+pip install clr-arista-mcp
 # or
-uvx arista-mcp-server
+uvx clr-arista-mcp
 ```
 
 ## Configuration
@@ -35,16 +35,16 @@ uvx arista-mcp-server
 See `--help` for additional options:
 
 ```bash
-arista-mcp-server --help
+clr-arista-mcp --help
 ```
 
 ## Development
 
 ```bash
-git clone https://github.com/clearminds/arista-mcp-server.git
-cd arista-mcp-server
+git clone https://github.com/clearminds/clr-arista-mcp.git
+cd clr-arista-mcp
 uv sync
-uv run arista-mcp-server
+uv run clr-arista-mcp
 ```
 
 ## License
