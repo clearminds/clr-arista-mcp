@@ -17,10 +17,24 @@ class EOSClient:
     is unavailable or for raw text output.
     """
 
-    def __init__(self, username: str, password: str, ssh_key: str = "") -> None:
+    def __init__(
+        self,
+        username: str = "",
+        password: str = "",
+        ssh_key: str = "",
+        devices: dict[str, dict[str, str]] | None = None,
+    ) -> None:
         self.username = username
         self.password = password
         self.ssh_key = ssh_key
+        self.devices = devices or {}
+
+    def _get_auth(self, host: str) -> tuple[str, str]:
+        """Return (username, password) for a specific host."""
+        device_creds = self.devices.get(host, {})
+        username = device_creds.get("username", self.username)
+        password = device_creds.get("password", self.password)
+        return username, password
 
     def _port_open(self, host: str, port: int, timeout: float = 2.0) -> bool:
         """Check if a TCP port is open."""
@@ -54,6 +68,7 @@ class EOSClient:
         Returns list of result dicts (one per command).
         """
         url = self._get_eapi_url(host)
+        username, password = self._get_auth(host)
         payload = {
             "jsonrpc": "2.0",
             "method": "runCmds",
@@ -66,7 +81,7 @@ class EOSClient:
         }
 
         with httpx.Client(
-            auth=(self.username, self.password),
+            auth=(username, password),
             verify=False,
             timeout=30.0,
         ) as client:
@@ -119,13 +134,14 @@ class EOSClient:
 
         Returns command output as string.
         """
+        username, password = self._get_auth(host)
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
             connect_kwargs: dict[str, Any] = {
                 "hostname": host,
                 "port": 22,
-                "username": self.username,
+                "username": username,
                 "timeout": timeout,
                 "allow_agent": False,
                 "look_for_keys": False,
@@ -133,7 +149,7 @@ class EOSClient:
             if self.ssh_key:
                 connect_kwargs["key_filename"] = self.ssh_key
             else:
-                connect_kwargs["password"] = self.password
+                connect_kwargs["password"] = password
 
             client.connect(**connect_kwargs)
             _, stdout, stderr = client.exec_command(command, timeout=timeout)

@@ -55,16 +55,21 @@ class Settings(BaseSettings):
                     creds["password"] = file_creds["password"]
                 if "ssh_key" in file_creds:
                     creds["ssh_key"] = file_creds["ssh_key"]
+                if "devices" in file_creds:
+                    creds["devices"] = file_creds["devices"]
 
                 logger.info(f"Loaded Arista credentials from {CREDS_PATH}")
             except (json.JSONDecodeError, KeyError) as e:
                 logger.warning(f"Failed to load {CREDS_PATH}: {e}")
 
+        creds.setdefault("devices", {})
+
         if not (creds.get("username") and (creds.get("password") or creds.get("ssh_key"))):
-            logger.warning(
-                "No Arista credentials configured. Set ARISTA_USERNAME and "
-                "(ARISTA_PASSWORD or ARISTA_SSH_KEY) env vars or create "
-                f"{CREDS_PATH}"
-            )
+            if not creds["devices"]:
+                logger.warning(
+                    "No Arista credentials configured. Set ARISTA_USERNAME and "
+                    "(ARISTA_PASSWORD or ARISTA_SSH_KEY) env vars or create "
+                    f"{CREDS_PATH}"
+                )
 
         return creds

@@ -297,15 +297,14 @@ def main() -> None:
 
     logger = logging.getLogger(__name__)
 
-    if not settings.arista_password:
-        logger.error("MIKROTIK_PASSWORD is required")
-        sys.exit(1)
+    creds = settings.load_credentials()
 
-    logger.info("Starting Arista EOS MCP Server (user: %s)", settings.arista_username)
+    logger.info("Starting Arista EOS MCP Server (user: %s)", creds.get("username", ""))
     _client = EOSClient(
-        settings.arista_username,
-        settings.arista_password,
-        settings.arista_ssh_key,
+        username=creds.get("username", ""),
+        password=creds.get("password", ""),
+        ssh_key=creds.get("ssh_key", ""),
+        devices=creds.get("devices", {}),
     )
 
     try:
