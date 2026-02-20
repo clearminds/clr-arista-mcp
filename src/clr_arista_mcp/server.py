@@ -25,6 +25,9 @@ def arista_version(host: str) -> dict[str, Any]:
 
     Args:
         host: Switch IP or hostname (e.g. "10.20.10.218").
+
+    Returns:
+        A dict with EOS version, model, serial number, and uptime.
     """
     return _client.eapi_run(host, "show version")
 
@@ -39,7 +42,8 @@ def arista_interfaces(host: str) -> dict[str, Any]:
     Args:
         host: Switch IP or hostname.
 
-    Returns dict keyed by interface name with status, speed, type.
+    Returns:
+        A dict keyed by interface name with status, speed, and type.
     """
     return _client.eapi_run(host, "show interfaces status")
 
@@ -51,7 +55,8 @@ def arista_interface_counters(host: str) -> dict[str, Any]:
     Args:
         host: Switch IP or hostname.
 
-    Returns interface counters including errors, discards.
+    Returns:
+        A dict of interface counters including errors and discards.
     """
     return _client.eapi_run(host, "show interfaces counters errors")
 
@@ -65,6 +70,9 @@ def arista_vlans(host: str) -> dict[str, Any]:
 
     Args:
         host: Switch IP or hostname.
+
+    Returns:
+        A dict of VLANs with their names and assigned interfaces.
     """
     return _client.eapi_run(host, "show vlan brief")
 
@@ -79,6 +87,9 @@ def arista_mac_table(
     Args:
         host: Switch IP or hostname.
         vlan: VLAN ID to filter by (omit for all).
+
+    Returns:
+        A dict containing MAC address entries.
     """
     cmd = f"show mac address-table vlan {vlan}" if vlan else "show mac address-table"
     return _client.eapi_run(host, cmd)
@@ -90,6 +101,9 @@ def arista_lldp(host: str) -> dict[str, Any]:
 
     Args:
         host: Switch IP or hostname.
+
+    Returns:
+        A dict of LLDP neighbor entries per interface.
     """
     return _client.eapi_run(host, "show lldp neighbors")
 
@@ -107,6 +121,9 @@ def arista_arp(
     Args:
         host: Switch IP or hostname.
         vrf: VRF name to filter by (e.g. "management").
+
+    Returns:
+        A dict containing ARP table entries.
     """
     cmd = f"show arp vrf {vrf}" if vrf else "show arp"
     return _client.eapi_run(host, cmd)
@@ -118,6 +135,9 @@ def arista_ip_interfaces(host: str) -> dict[str, Any]:
 
     Args:
         host: Switch IP or hostname.
+
+    Returns:
+        A dict of interfaces with their IP addresses and status.
     """
     return _client.eapi_run(host, "show ip interface brief")
 
@@ -132,7 +152,8 @@ def arista_bgp_summary(host: str) -> dict[str, Any]:
     Args:
         host: Switch IP or hostname.
 
-    Returns BGP neighbor states, prefix counts, uptime.
+    Returns:
+        A dict with BGP neighbor states, prefix counts, and uptime.
     """
     return _client.eapi_run(host, "show ip bgp summary")
 
@@ -143,6 +164,9 @@ def arista_routes(host: str) -> dict[str, Any]:
 
     Args:
         host: Switch IP or hostname.
+
+    Returns:
+        A dict with route counts per protocol and total.
     """
     return _client.eapi_run(host, "show ip route summary")
 
@@ -160,6 +184,9 @@ def arista_config(
     Args:
         host: Switch IP or hostname.
         section: Config section to filter (e.g. "router bgp", "interface Ethernet1").
+
+    Returns:
+        The running configuration as a string.
     """
     cmd = f"show running-config section {section}" if section else "show running-config"
     result = _client.eapi_run(host, cmd, fmt="text")
@@ -185,7 +212,8 @@ def arista_cmd(
         fmt: Output format — "json" (structured) or "text" (raw).
             Use "text" as fallback for older EOS or unsupported JSON output.
 
-    Returns parsed result.
+    Returns:
+        The parsed result (dict for JSON format, string for text).
     """
     return _client.eapi_run(host, command, fmt)
 
@@ -205,7 +233,8 @@ def arista_multi(
         commands: List of EOS CLI commands.
         fmt: Output format.
 
-    Returns list of results (one per command).
+    Returns:
+        A list of results, one per command.
     """
     return _client.eapi_call(host, commands, fmt)
 
@@ -224,7 +253,8 @@ def arista_configure(
         host: Switch IP or hostname.
         commands: List of config commands (e.g. ["interface Ethernet1", "description Uplink"]).
 
-    Returns confirmation message.
+    Returns:
+        A confirmation message with the number of commands applied.
     """
     _client.eapi_configure(host, commands)
     return f"Applied {len(commands)} config commands on {host}"
@@ -244,7 +274,8 @@ def arista_ssh(
         host: Switch IP or hostname.
         command: EOS CLI command.
 
-    Returns command output as text.
+    Returns:
+        The command output as text.
     """
     return _client.ssh_command(host, command)
 

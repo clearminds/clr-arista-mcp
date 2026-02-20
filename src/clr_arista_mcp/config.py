@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     Priority order:
     1. ~/.config/arista/credentials.json
     2. Environment variables (ARISTA_USERNAME, ARISTA_PASSWORD, ARISTA_SSH_KEY) - override
+
+    Attributes:
+        arista_username: Username for Arista EOS authentication.
+        arista_password: Password for Arista EOS authentication.
+        arista_ssh_key: Path to an SSH private key (optional alternative to password).
+        arista_transport: MCP transport mode ("stdio" or "http").
+        arista_log_level: Logging level for the server.
     """
 
     arista_username: str = ""

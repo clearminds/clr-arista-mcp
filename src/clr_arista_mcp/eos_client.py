@@ -15,6 +15,12 @@ class EOSClient:
 
     eAPI is preferred (structured JSON). SSH fallback for when eAPI
     is unavailable or for raw text output.
+
+    Attributes:
+        username: Default username for switch authentication.
+        password: Default password for switch authentication.
+        ssh_key: Path to SSH private key (empty string if unused).
+        devices: Per-device credential overrides keyed by hostname.
     """
 
     def __init__(
@@ -30,14 +36,33 @@ class EOSClient:
         self.devices = devices or {}
 
     def _get_auth(self, host: str) -> tuple[str, str]:
-        """Return (username, password) for a specific host."""
+        """Return username and password for a specific host.
+
+        Per-device credentials from the devices dict take precedence
+        over the global defaults.
+
+        Args:
+            host: Switch IP or hostname.
+
+        Returns:
+            A tuple of (username, password).
+        """
         device_creds = self.devices.get(host, {})
         username = device_creds.get("username", self.username)
         password = device_creds.get("password", self.password)
         return username, password
 
     def _port_open(self, host: str, port: int, timeout: float = 2.0) -> bool:
-        """Check if a TCP port is open."""
+        """Check if a TCP port is open.
+
+        Args:
+            host: Target IP or hostname.
+            port: TCP port number.
+            timeout: Connection timeout in seconds.
+
+        Returns:
+            True if the port accepted a connection, False otherwise.
+        """
         try:
             with socket.create_connection((host, port), timeout=timeout):
                 return True
@@ -45,7 +70,17 @@ class EOSClient:
             return False
 
     def _get_eapi_url(self, host: str) -> str:
-        """Probe HTTPS then HTTP, return eAPI URL."""
+        """Probe HTTPS then HTTP and return the eAPI URL.
+
+        Args:
+            host: Switch IP or hostname.
+
+        Returns:
+            The eAPI endpoint URL (HTTPS preferred, HTTP fallback).
+
+        Raises:
+            ConnectionError: If neither port 443 nor port 80 is reachable.
+        """
         if self._port_open(host, 443):
             return f"https://{host}/command-api"
         if self._port_open(host, 80):
@@ -65,7 +100,12 @@ class EOSClient:
             commands: List of EOS CLI commands.
             fmt: Output format — "json" or "text".
 
-        Returns list of result dicts (one per command).
+        Returns:
+            A list of result dicts, one per command.
+
+        Raises:
+            ConnectionError: If the switch is unreachable on ports 443/80.
+            RuntimeError: If the eAPI response contains an error.
         """
         url = self._get_eapi_url(host)
         username, password = self._get_auth(host)
@@ -103,7 +143,8 @@ class EOSClient:
             command: Single EOS CLI command.
             fmt: Output format.
 
-        Returns result dict for the command.
+        Returns:
+            The result dict for the command.
         """
         results = self.eapi_call(host, [command], fmt)
         return results[0] if results else {}
@@ -117,7 +158,8 @@ class EOSClient:
             host: Switch IP or hostname.
             commands: List of config commands.
 
-        Returns list of results.
+        Returns:
+            A list of result dicts for each session command.
         """
         session_cmds = ["configure session mcp-config"] + commands + ["commit"]
         return self.eapi_call(host, session_cmds)
@@ -132,7 +174,8 @@ class EOSClient:
             command: EOS CLI command.
             timeout: SSH timeout in seconds.
 
-        Returns command output as string.
+        Returns:
+            The command output as a string.
         """
         username, password = self._get_auth(host)
         client = paramiko.SSHClient()
