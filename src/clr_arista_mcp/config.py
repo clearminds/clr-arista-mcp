@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     arista_ssh_key: str = ""  # Path to SSH private key (optional)
     arista_transport: str = "stdio"
     arista_log_level: str = "INFO"
+    arista_read_only: bool = False
 
     model_config = {"env_prefix": ""}
 
