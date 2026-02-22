@@ -10,8 +10,10 @@ from fastmcp import FastMCP
 
 from clr_arista_mcp.config import Settings
 from clr_arista_mcp.eos_client import EOSClient
+from clr_arista_mcp.middleware import ToolValidationMiddleware
 
 mcp = FastMCP("Arista")
+mcp.add_middleware(ToolValidationMiddleware())
 _client: EOSClient | None = None
 
 WRITE_TOOLS = ["arista_configure", "arista_ssh"]
