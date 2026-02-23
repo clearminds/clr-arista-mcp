@@ -32,6 +32,14 @@ uvx clr-arista-mcp
 | `ARISTA_PASSWORD` | Arista password | `your-password` |
 | `ARISTA_SSH_KEY` | SSH key path | `/path/to/id_rsa` |
 
+Optional:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ARISTA_READ_ONLY` | Run in read-only mode | `false` |
+| `ARISTA_TRANSPORT` | Transport protocol (`stdio` or `http`) | `stdio` |
+| `ARISTA_LOG_LEVEL` | Log level | `INFO` |
+
 See `--help` for additional options:
 
 ```bash
