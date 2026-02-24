@@ -27,7 +27,7 @@ def arista_version(host: str) -> dict[str, Any]:
     """Get EOS version, model, serial, and uptime.
 
     Args:
-        host: Switch IP or hostname (e.g. "10.20.10.218").
+        host: Switch IP or hostname (e.g. "192.168.1.1").
 
     Returns:
         A dict with EOS version, model, serial number, and uptime.
