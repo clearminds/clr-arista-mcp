@@ -2,12 +2,26 @@
 
 import logging
 import socket
+import ssl
 from typing import Any
 
 import httpx
 import paramiko
 
 logger = logging.getLogger(__name__)
+
+
+def _make_ssl_context() -> ssl.SSLContext:
+    """Create an SSL context that accepts self-signed certs and legacy ciphers.
+
+    Older EOS versions (e.g. 4.18) only offer legacy cipher suites that
+    OpenSSL 3.x rejects at the default security level.
+    """
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    ctx.set_ciphers("DEFAULT:@SECLEVEL=1")
+    return ctx
 
 
 class EOSClient:
@@ -122,7 +136,7 @@ class EOSClient:
 
         with httpx.Client(
             auth=(username, password),
-            verify=False,
+            verify=_make_ssl_context(),
             timeout=30.0,
         ) as client:
             resp = client.post(url, json=payload)
