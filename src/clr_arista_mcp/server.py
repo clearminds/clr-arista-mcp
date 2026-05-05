@@ -14,15 +14,29 @@ from clr_arista_mcp.middleware import ToolValidationMiddleware
 
 mcp = FastMCP("Arista")
 mcp.add_middleware(ToolValidationMiddleware())
-_client: EOSClient | None = None
 
-WRITE_TOOLS = ["arista_configure", "arista_ssh"]
+# Imported here (not at the top) on purpose: annotations.py needs ``mcp`` from
+# this module, so importing it before the ``mcp = FastMCP(...)`` line above
+# would be a circular import. Do not move.
+from clr_arista_mcp.annotations import (  # noqa: E402
+    destructive_tool,
+    read_tool,
+    remove_non_read_tools,
+    write_tool,
+)
+from clr_arista_mcp._verbs import (  # noqa: E402
+    require_show,
+    reject_destructive,
+    require_destructive,
+)
+
+_client: EOSClient | None = None
 
 
 # ── System tools ─────────────────────────────────────────────────────
 
 
-@mcp.tool
+@read_tool
 def arista_version(host: str) -> dict[str, Any]:
     """Get EOS version, model, serial, and uptime.
 
@@ -38,7 +52,7 @@ def arista_version(host: str) -> dict[str, Any]:
 # ── Interface tools ──────────────────────────────────────────────────
 
 
-@mcp.tool
+@read_tool
 def arista_interfaces(host: str) -> dict[str, Any]:
     """Get interface status summary (all interfaces).
 
@@ -51,7 +65,7 @@ def arista_interfaces(host: str) -> dict[str, Any]:
     return _client.eapi_run(host, "show interfaces status")
 
 
-@mcp.tool
+@read_tool
 def arista_interface_counters(host: str) -> dict[str, Any]:
     """Get interface error counters.
 
@@ -67,7 +81,7 @@ def arista_interface_counters(host: str) -> dict[str, Any]:
 # ── L2 tools ─────────────────────────────────────────────────────────
 
 
-@mcp.tool
+@read_tool
 def arista_vlans(host: str) -> dict[str, Any]:
     """List all VLANs configured on the switch.
 
@@ -80,7 +94,7 @@ def arista_vlans(host: str) -> dict[str, Any]:
     return _client.eapi_run(host, "show vlan brief")
 
 
-@mcp.tool
+@read_tool
 def arista_mac_table(
     host: str,
     vlan: int | None = None,
@@ -98,7 +112,7 @@ def arista_mac_table(
     return _client.eapi_run(host, cmd)
 
 
-@mcp.tool
+@read_tool
 def arista_lldp(host: str) -> dict[str, Any]:
     """Get LLDP neighbor information.
 
@@ -114,7 +128,7 @@ def arista_lldp(host: str) -> dict[str, Any]:
 # ── L3 tools ─────────────────────────────────────────────────────────
 
 
-@mcp.tool
+@read_tool
 def arista_arp(
     host: str,
     vrf: str | None = None,
@@ -132,7 +146,7 @@ def arista_arp(
     return _client.eapi_run(host, cmd)
 
 
-@mcp.tool
+@read_tool
 def arista_ip_interfaces(host: str) -> dict[str, Any]:
     """Get IP interface brief — interface IPs and status.
 
@@ -148,7 +162,7 @@ def arista_ip_interfaces(host: str) -> dict[str, Any]:
 # ── Routing tools ────────────────────────────────────────────────────
 
 
-@mcp.tool
+@read_tool
 def arista_bgp_summary(host: str) -> dict[str, Any]:
     """Get BGP peer summary.
 
@@ -161,7 +175,7 @@ def arista_bgp_summary(host: str) -> dict[str, Any]:
     return _client.eapi_run(host, "show ip bgp summary")
 
 
-@mcp.tool
+@read_tool
 def arista_routes(host: str) -> dict[str, Any]:
     """Get IP routing table summary.
 
@@ -177,7 +191,7 @@ def arista_routes(host: str) -> dict[str, Any]:
 # ── Config tools ─────────────────────────────────────────────────────
 
 
-@mcp.tool
+@read_tool
 def arista_config(
     host: str,
     section: str | None = None,
@@ -201,7 +215,7 @@ def arista_config(
 # ── Raw tools ────────────────────────────────────────────────────────
 
 
-@mcp.tool
+@write_tool
 def arista_cmd(
     host: str,
     command: str,
@@ -218,10 +232,11 @@ def arista_cmd(
     Returns:
         The parsed result (dict for JSON format, string for text).
     """
+    reject_destructive(command)
     return _client.eapi_run(host, command, fmt)
 
 
-@mcp.tool
+@write_tool
 def arista_multi(
     host: str,
     commands: list[str],
@@ -239,10 +254,12 @@ def arista_multi(
     Returns:
         A list of results, one per command.
     """
+    for cmd in commands:
+        reject_destructive(cmd)
     return _client.eapi_call(host, commands, fmt)
 
 
-@mcp.tool
+@destructive_tool
 def arista_configure(
     host: str,
     commands: list[str],
@@ -263,7 +280,7 @@ def arista_configure(
     return f"Applied {len(commands)} config commands on {host}"
 
 
-@mcp.tool
+@destructive_tool
 def arista_ssh(
     host: str,
     command: str,
@@ -283,6 +300,67 @@ def arista_ssh(
     return _client.ssh_command(host, command)
 
 
+# ── Generic-exec splits ──────────────────────────────────────────────
+
+
+@read_tool
+def arista_show(host: str, command: str, fmt: str = "json") -> Any:
+    """Execute a read-only EOS 'show ...' command via eAPI.
+
+    Refuses any command that is not a show command. Use ``arista_cmd``
+    for non-destructive non-show commands and ``arista_cmd_destructive``
+    for reload/write erase/clear/delete file.
+
+    Args:
+        host: Switch IP or hostname.
+        command: EOS show command (e.g. "show ip ospf neighbor").
+        fmt: Output format — "json" or "text".
+
+    Returns:
+        Parsed result.
+    """
+    require_show(command)
+    return _client.eapi_run(host, command, fmt)
+
+
+@read_tool
+def arista_show_multi(host: str, commands: list[str], fmt: str = "json") -> list[Any]:
+    """Execute multiple read-only EOS show commands in a single eAPI call.
+
+    Refuses if any command in the list is not a show command.
+
+    Args:
+        host: Switch IP or hostname.
+        commands: List of EOS show commands.
+        fmt: Output format — "json" or "text".
+
+    Returns:
+        A list of results, one per command.
+    """
+    for cmd in commands:
+        require_show(cmd)
+    return _client.eapi_call(host, commands, fmt)
+
+
+@destructive_tool
+def arista_cmd_destructive(host: str, command: str, fmt: str = "json") -> Any:
+    """Execute a destructive EOS command (reload, write erase, clear, delete file).
+
+    Refuses anything that is not destructive — use ``arista_cmd`` for
+    write commands and ``arista_show`` for show commands.
+
+    Args:
+        host: Switch IP or hostname.
+        command: EOS destructive command.
+        fmt: Output format — "json" or "text".
+
+    Returns:
+        Parsed result.
+    """
+    require_destructive(command)
+    return _client.eapi_run(host, command, fmt)
+
+
 # ── Composite init ───────────────────────────────────────────────────
 
 
@@ -300,9 +378,8 @@ def init_composite() -> FastMCP:
         devices=creds.get("devices", {}),
     )
 
-    if settings.arista_read_only and WRITE_TOOLS:
-        for name in WRITE_TOOLS:
-            mcp.remove_tool(name)
+    if settings.arista_read_only:
+        remove_non_read_tools(mcp)
 
     return mcp
 
@@ -372,10 +449,9 @@ def main() -> None:
     )
 
     read_only = args.read_only if args.read_only is not None else settings.arista_read_only
-    if read_only and WRITE_TOOLS:
-        for name in WRITE_TOOLS:
-            mcp.remove_tool(name)
-        logger.info("Read-only mode: %d write tools removed", len(WRITE_TOOLS))
+    if read_only:
+        removed = remove_non_read_tools(mcp)
+        logger.info("Read-only mode: %d non-read tools removed", removed)
 
     try:
         if transport == "stdio":
