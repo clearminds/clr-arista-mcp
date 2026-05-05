@@ -361,6 +361,29 @@ def arista_cmd_destructive(host: str, command: str, fmt: str = "json") -> Any:
     return _client.eapi_run(host, command, fmt)
 
 
+# ── Composite init ───────────────────────────────────────────────────
+
+
+def init_composite() -> FastMCP:
+    """Initialize for composite mounting. Returns the FastMCP instance."""
+    global _client
+
+    settings = Settings()
+    creds = settings.load_credentials()
+
+    _client = EOSClient(
+        username=creds.get("username", ""),
+        password=creds.get("password", ""),
+        ssh_key=creds.get("ssh_key", ""),
+        devices=creds.get("devices", {}),
+    )
+
+    if settings.arista_read_only:
+        remove_non_read_tools(mcp)
+
+    return mcp
+
+
 # ── Main entry point ─────────────────────────────────────────────────
 
 
