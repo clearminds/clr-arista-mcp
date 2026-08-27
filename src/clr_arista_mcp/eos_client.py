@@ -203,6 +203,50 @@ class EOSClient:
             except Exception:  # noqa: BLE001 - cleanup must not mask the caller's error
                 logger.debug("Could not remove config session %s on %s", session, host)
 
+    def eapi_sessions(self, host: str) -> dict[str, Any]:
+        """List config sessions on a switch.
+
+        Returns:
+            A dict with ``sessions`` (name -> {state, description}) plus the
+            ``maxOpenSessions`` / ``maxSavedSessions`` limits. EOS keeps at
+            most one *completed* session and evicts the oldest automatically;
+            pending sessions are the ones holding uncommitted changes.
+        """
+        return self.eapi_run(host, "show configuration sessions detail")
+
+    def eapi_session_stage(
+        self,
+        host: str,
+        session: str,
+        commands: list[EapiCommand],
+    ) -> list[Any]:
+        """Apply commands to a named session WITHOUT committing.
+
+        Creates the session if absent, resumes it if already pending. Changes
+        stay invisible to running-config until committed, so this is the
+        "propose" half of a propose/review/commit workflow.
+        """
+        return self.eapi_call(host, [f"configure session {session}", *commands])
+
+    def eapi_session_diff(self, host: str, session: str) -> str:
+        """Return the pending diff of a session against running-config."""
+        result = self.eapi_run(
+            host, f"show session-config named {session} diffs", "text"
+        )
+        return result.get("output", "")
+
+    def eapi_session_commit(self, host: str, session: str) -> list[Any]:
+        """Commit a pending session.
+
+        NOTE: EOS does not detect overlapping edits. If two sessions changed
+        the same object, the last commit silently wins — review the diff first.
+        """
+        return self.eapi_call(host, [f"configure session {session}", "commit"])
+
+    def eapi_session_abort(self, host: str, session: str) -> list[Any]:
+        """Discard a session and its uncommitted changes."""
+        return self.eapi_call(host, [f"configure session {session} abort"])
+
     def ssh_command(self, host: str, command: str, timeout: float = 30.0) -> str:
         """Execute an EOS command via SSH.
 

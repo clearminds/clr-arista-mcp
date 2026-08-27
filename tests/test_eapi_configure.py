@@ -81,3 +81,34 @@ def test_structured_command_with_input_is_passed_through(
     client.eapi_configure("sw1", ["vlan 1142", comment])
 
     assert client.batches[0][2] == comment
+
+
+def test_stage_does_not_commit(client: _RecordingClient) -> None:
+    """Staging is the 'propose' step — a commit here would defeat the point."""
+    client.eapi_session_stage("sw1", "review-me", ["vlan 10", "name test"])
+
+    batch = client.batches[0]
+    assert batch[0] == "configure session review-me"
+    assert "commit" not in batch
+
+
+def test_stage_resumes_existing_session_by_name(client: _RecordingClient) -> None:
+    client.eapi_session_stage("sw1", "review-me", ["vlan 10"])
+    client.eapi_session_stage("sw1", "review-me", ["vlan 11"])
+
+    assert client.batches[0][0] == client.batches[1][0] == "configure session review-me"
+
+
+def test_commit_and_abort_target_the_named_session(client: _RecordingClient) -> None:
+    client.eapi_session_commit("sw1", "review-me")
+    client.eapi_session_abort("sw1", "review-me")
+
+    assert client.batches[0] == ["configure session review-me", "commit"]
+    assert client.batches[1] == ["configure session review-me abort"]
+
+
+def test_stage_accepts_structured_commands(client: _RecordingClient) -> None:
+    comment = {"cmd": "comment", "input": "why this exists\n"}
+    client.eapi_session_stage("sw1", "review-me", ["vlan 1142", comment])
+
+    assert client.batches[0][2] == comment

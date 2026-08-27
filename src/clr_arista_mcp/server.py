@@ -284,6 +284,106 @@ def arista_configure(
     return f"Applied {len(commands)} config commands on {host}"
 
 
+@read_tool
+def arista_config_sessions(host: str) -> dict[str, Any]:
+    """List configuration sessions on a switch.
+
+    Use before configuring to see whether someone is mid-edit. A *pending*
+    session holds uncommitted changes that are invisible in running-config
+    until committed. Up to 5 pending sessions can coexist, so an existing
+    session does NOT block you from making your own change.
+
+    EOS retains only ONE *completed* session and evicts the oldest
+    automatically, so a leftover completed session is harmless — it is only a
+    problem if a new session reuses its exact name.
+
+    Args:
+        host: Switch IP or hostname.
+
+    Returns:
+        Sessions keyed by name with their state, plus the session limits.
+    """
+    return _client.eapi_sessions(host)
+
+
+@write_tool
+def arista_session_stage(
+    host: str,
+    session: str,
+    commands: list[str | dict[str, Any]],
+) -> str:
+    """Stage config in a named session WITHOUT committing it.
+
+    The "propose" half of propose -> review -> commit. Creates the session if
+    it does not exist, resumes it if already pending. Nothing reaches
+    running-config until `arista_session_commit`. Review first with
+    `arista_session_diff`, or discard with `arista_session_abort`.
+
+    Args:
+        host: Switch IP or hostname.
+        session: Session name. Pick something identifiable, not a shared name.
+        commands: Config commands; entries may be dicts carrying multi-line
+            input (see `arista_configure`).
+
+    Returns:
+        A confirmation message.
+    """
+    _client.eapi_session_stage(host, session, commands)
+    return (
+        f"Staged {len(commands)} commands in session {session!r} on {host} "
+        f"(not committed — review with arista_session_diff)"
+    )
+
+
+@read_tool
+def arista_session_diff(host: str, session: str) -> str:
+    """Show what a pending session would change, as a unified diff.
+
+    Args:
+        host: Switch IP or hostname.
+        session: Session name.
+
+    Returns:
+        Diff of the session config against running-config; empty if no change.
+    """
+    return _client.eapi_session_diff(host, session)
+
+
+@destructive_tool
+def arista_session_commit(host: str, session: str) -> str:
+    """Commit a pending session, applying its changes to running-config.
+
+    EOS does NOT detect overlapping edits: if another session changed the same
+    object, the last commit silently wins with no warning. Review
+    `arista_session_diff` first. Commits are not saved to startup-config —
+    follow with `write memory` if the change should survive a reload.
+
+    Args:
+        host: Switch IP or hostname.
+        session: Session name.
+
+    Returns:
+        A confirmation message.
+    """
+    _client.eapi_session_commit(host, session)
+    return f"Committed session {session!r} on {host}"
+
+
+@destructive_tool
+def arista_session_abort(host: str, session: str) -> str:
+    """Discard a session and all of its uncommitted changes.
+
+    Args:
+        host: Switch IP or hostname.
+        session: Session name.
+
+    Returns:
+        A confirmation message.
+    """
+    _client.eapi_session_abort(host, session)
+    return f"Aborted session {session!r} on {host}"
+
+
 @destructive_tool
 def arista_comment(
     host: str,
