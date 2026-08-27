@@ -262,7 +262,7 @@ def arista_multi(
 @destructive_tool
 def arista_configure(
     host: str,
-    commands: list[str],
+    commands: list[str | dict[str, Any]],
 ) -> str:
     """Apply configuration commands via eAPI session (atomic).
 
@@ -272,12 +272,51 @@ def arista_configure(
     Args:
         host: Switch IP or hostname.
         commands: List of config commands (e.g. ["interface Ethernet1", "description Uplink"]).
+            An entry may instead be a dict {"cmd": ..., "input": ...} to supply
+            multi-line input to commands that prompt for a body, such as
+            ``comment`` or ``banner``. Note a bare "!! text" string is rejected
+            by eAPI — use ``arista_comment`` or the dict form.
 
     Returns:
         A confirmation message with the number of commands applied.
     """
     _client.eapi_configure(host, commands)
     return f"Applied {len(commands)} config commands on {host}"
+
+
+@destructive_tool
+def arista_comment(
+    host: str,
+    section: str,
+    text: str,
+) -> str:
+    """Set a persistent ``!!`` comment on a config section.
+
+    EOS stores the comment in running-config (and startup-config once saved),
+    so this is a durable annotation — unlike a "!" line, which is stripped.
+    Useful for recording provenance, e.g. the Nodus network description behind
+    a VLAN whose name is limited to 32 characters.
+
+    Only sections that support the ``comment`` sub-command work — notably
+    ``interface X`` and ``vlan N``. Global level is not supported, and
+    ``username`` has no sub-mode so users cannot carry a comment.
+
+    Args:
+        host: Switch IP or hostname.
+        section: Config section to enter, e.g. "vlan 1142" or "interface Ethernet1".
+        text: Comment body. May contain spaces and UTF-8; pass an empty string
+            to remove an existing comment.
+
+    Returns:
+        A confirmation message.
+    """
+    if not text.strip():
+        _client.eapi_configure(host, [section, "no comment"])
+        return f"Removed comment on {section} on {host}"
+
+    body = text if text.endswith("\n") else text + "\n"
+    _client.eapi_configure(host, [section, {"cmd": "comment", "input": body}])
+    return f"Set comment on {section} on {host}"
 
 
 @destructive_tool
@@ -425,7 +464,9 @@ def main() -> None:
         devices=creds.get("devices", {}),
     )
 
-    read_only = args.read_only if args.read_only is not None else settings.arista_read_only
+    read_only = (
+        args.read_only if args.read_only is not None else settings.arista_read_only
+    )
     if read_only:
         removed = remove_non_read_tools(mcp)
         logger.info("Read-only mode: %d non-read tools removed", removed)
