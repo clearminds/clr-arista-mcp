@@ -262,7 +262,7 @@ def arista_multi(
 @destructive_tool
 def arista_configure(
     host: str,
-    commands: list[str],
+    commands: list[str | dict[str, Any]],
 ) -> str:
     """Apply configuration commands via eAPI session (atomic).
 
@@ -272,12 +272,151 @@ def arista_configure(
     Args:
         host: Switch IP or hostname.
         commands: List of config commands (e.g. ["interface Ethernet1", "description Uplink"]).
+            An entry may instead be a dict {"cmd": ..., "input": ...} to supply
+            multi-line input to commands that prompt for a body, such as
+            ``comment`` or ``banner``. Note a bare "!! text" string is rejected
+            by eAPI — use ``arista_comment`` or the dict form.
 
     Returns:
         A confirmation message with the number of commands applied.
     """
     _client.eapi_configure(host, commands)
     return f"Applied {len(commands)} config commands on {host}"
+
+
+@read_tool
+def arista_config_sessions(host: str) -> dict[str, Any]:
+    """List configuration sessions on a switch.
+
+    Use before configuring to see whether someone is mid-edit. A *pending*
+    session holds uncommitted changes that are invisible in running-config
+    until committed. Up to 5 pending sessions can coexist, so an existing
+    session does NOT block you from making your own change.
+
+    EOS retains only ONE *completed* session and evicts the oldest
+    automatically, so a leftover completed session is harmless — it is only a
+    problem if a new session reuses its exact name.
+
+    Args:
+        host: Switch IP or hostname.
+
+    Returns:
+        Sessions keyed by name with their state, plus the session limits.
+    """
+    return _client.eapi_sessions(host)
+
+
+@write_tool
+def arista_session_stage(
+    host: str,
+    session: str,
+    commands: list[str | dict[str, Any]],
+) -> str:
+    """Stage config in a named session WITHOUT committing it.
+
+    The "propose" half of propose -> review -> commit. Creates the session if
+    it does not exist, resumes it if already pending. Nothing reaches
+    running-config until `arista_session_commit`. Review first with
+    `arista_session_diff`, or discard with `arista_session_abort`.
+
+    Args:
+        host: Switch IP or hostname.
+        session: Session name. Pick something identifiable, not a shared name.
+        commands: Config commands; entries may be dicts carrying multi-line
+            input (see `arista_configure`).
+
+    Returns:
+        A confirmation message.
+    """
+    _client.eapi_session_stage(host, session, commands)
+    return (
+        f"Staged {len(commands)} commands in session {session!r} on {host} "
+        f"(not committed — review with arista_session_diff)"
+    )
+
+
+@read_tool
+def arista_session_diff(host: str, session: str) -> str:
+    """Show what a pending session would change, as a unified diff.
+
+    Args:
+        host: Switch IP or hostname.
+        session: Session name.
+
+    Returns:
+        Diff of the session config against running-config; empty if no change.
+    """
+    return _client.eapi_session_diff(host, session)
+
+
+@destructive_tool
+def arista_session_commit(host: str, session: str) -> str:
+    """Commit a pending session, applying its changes to running-config.
+
+    EOS does NOT detect overlapping edits: if another session changed the same
+    object, the last commit silently wins with no warning. Review
+    `arista_session_diff` first. Commits are not saved to startup-config —
+    follow with `write memory` if the change should survive a reload.
+
+    Args:
+        host: Switch IP or hostname.
+        session: Session name.
+
+    Returns:
+        A confirmation message.
+    """
+    _client.eapi_session_commit(host, session)
+    return f"Committed session {session!r} on {host}"
+
+
+@destructive_tool
+def arista_session_abort(host: str, session: str) -> str:
+    """Discard a session and all of its uncommitted changes.
+
+    Args:
+        host: Switch IP or hostname.
+        session: Session name.
+
+    Returns:
+        A confirmation message.
+    """
+    _client.eapi_session_abort(host, session)
+    return f"Aborted session {session!r} on {host}"
+
+
+@destructive_tool
+def arista_comment(
+    host: str,
+    section: str,
+    text: str,
+) -> str:
+    """Set a persistent ``!!`` comment on a config section.
+
+    EOS stores the comment in running-config (and startup-config once saved),
+    so this is a durable annotation — unlike a "!" line, which is stripped.
+    Useful for recording provenance, e.g. the Nodus network description behind
+    a VLAN whose name is limited to 32 characters.
+
+    Only sections that support the ``comment`` sub-command work — notably
+    ``interface X`` and ``vlan N``. Global level is not supported, and
+    ``username`` has no sub-mode so users cannot carry a comment.
+
+    Args:
+        host: Switch IP or hostname.
+        section: Config section to enter, e.g. "vlan 1142" or "interface Ethernet1".
+        text: Comment body. May contain spaces and UTF-8; pass an empty string
+            to remove an existing comment.
+
+    Returns:
+        A confirmation message.
+    """
+    if not text.strip():
+        _client.eapi_configure(host, [section, "no comment"])
+        return f"Removed comment on {section} on {host}"
+
+    body = text if text.endswith("\n") else text + "\n"
+    _client.eapi_configure(host, [section, {"cmd": "comment", "input": body}])
+    return f"Set comment on {section} on {host}"
 
 
 @destructive_tool
@@ -425,7 +564,9 @@ def main() -> None:
         devices=creds.get("devices", {}),
     )
 
-    read_only = args.read_only if args.read_only is not None else settings.arista_read_only
+    read_only = (
+        args.read_only if args.read_only is not None else settings.arista_read_only
+    )
     if read_only:
         removed = remove_non_read_tools(mcp)
         logger.info("Read-only mode: %d non-read tools removed", removed)

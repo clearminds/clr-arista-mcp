@@ -3,10 +3,16 @@
 import logging
 import socket
 import ssl
+import uuid
 from typing import Any
 
 import httpx
 import paramiko
+
+# A command is either a plain CLI string, or a mapping carrying multi-line
+# input for commands that prompt for a body (``comment``, ``banner``):
+#     {"cmd": "comment", "input": "text\n"}
+EapiCommand = str | dict[str, Any]
 
 logger = logging.getLogger(__name__)
 
@@ -104,14 +110,18 @@ class EOSClient:
     def eapi_call(
         self,
         host: str,
-        commands: list[str],
+        commands: list[EapiCommand],
         fmt: str = "json",
     ) -> list[Any]:
         """Execute EOS CLI commands via eAPI JSON-RPC.
 
         Args:
             host: Switch IP or hostname.
-            commands: List of EOS CLI commands.
+            commands: List of EOS CLI commands. An entry may be a dict of the
+                form ``{"cmd": ..., "input": ...}`` to supply multi-line input
+                to commands that prompt for a body, e.g. ``comment`` or
+                ``banner``. A bare ``"!! text"`` string is NOT accepted by
+                eAPI — use the ``comment`` form instead.
             fmt: Output format — "json" or "text".
 
         Returns:
@@ -163,20 +173,79 @@ class EOSClient:
         results = self.eapi_call(host, [command], fmt)
         return results[0] if results else {}
 
-    def eapi_configure(self, host: str, commands: list[str]) -> list[Any]:
+    def eapi_configure(self, host: str, commands: list[EapiCommand]) -> list[Any]:
         """Execute configuration commands via eAPI session.
 
         Wraps commands in configure session for atomic apply.
 
+        The session name is unique per call. EOS retains only ONE *completed*
+        session, so a fixed name meant the second call onwards collided with
+        its own leftover and failed with "could not run command". The session
+        is also torn down after commit so the completed slot is left free.
+
         Args:
             host: Switch IP or hostname.
-            commands: List of config commands.
+            commands: List of config commands. Entries may be dicts carrying
+                multi-line input — see :meth:`eapi_call`.
 
         Returns:
             A list of result dicts for each session command.
         """
-        session_cmds = ["configure session mcp-config"] + commands + ["commit"]
-        return self.eapi_call(host, session_cmds)
+        session = f"mcp-{uuid.uuid4().hex[:12]}"
+        session_cmds = [f"configure session {session}", *commands, "commit"]
+        try:
+            return self.eapi_call(host, session_cmds)
+        finally:
+            # Free the single completed-session slot. Best effort: a failed
+            # apply leaves nothing to clean up, and never mask the real error.
+            try:
+                self.eapi_call(host, [f"no configure session {session}"])
+            except Exception:  # noqa: BLE001 - cleanup must not mask the caller's error
+                logger.debug("Could not remove config session %s on %s", session, host)
+
+    def eapi_sessions(self, host: str) -> dict[str, Any]:
+        """List config sessions on a switch.
+
+        Returns:
+            A dict with ``sessions`` (name -> {state, description}) plus the
+            ``maxOpenSessions`` / ``maxSavedSessions`` limits. EOS keeps at
+            most one *completed* session and evicts the oldest automatically;
+            pending sessions are the ones holding uncommitted changes.
+        """
+        return self.eapi_run(host, "show configuration sessions detail")
+
+    def eapi_session_stage(
+        self,
+        host: str,
+        session: str,
+        commands: list[EapiCommand],
+    ) -> list[Any]:
+        """Apply commands to a named session WITHOUT committing.
+
+        Creates the session if absent, resumes it if already pending. Changes
+        stay invisible to running-config until committed, so this is the
+        "propose" half of a propose/review/commit workflow.
+        """
+        return self.eapi_call(host, [f"configure session {session}", *commands])
+
+    def eapi_session_diff(self, host: str, session: str) -> str:
+        """Return the pending diff of a session against running-config."""
+        result = self.eapi_run(
+            host, f"show session-config named {session} diffs", "text"
+        )
+        return result.get("output", "")
+
+    def eapi_session_commit(self, host: str, session: str) -> list[Any]:
+        """Commit a pending session.
+
+        NOTE: EOS does not detect overlapping edits. If two sessions changed
+        the same object, the last commit silently wins — review the diff first.
+        """
+        return self.eapi_call(host, [f"configure session {session}", "commit"])
+
+    def eapi_session_abort(self, host: str, session: str) -> list[Any]:
+        """Discard a session and its uncommitted changes."""
+        return self.eapi_call(host, [f"configure session {session} abort"])
 
     def ssh_command(self, host: str, command: str, timeout: float = 30.0) -> str:
         """Execute an EOS command via SSH.
