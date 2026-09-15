@@ -37,7 +37,7 @@ _client: EOSClient | None = None
 
 
 @read_tool
-def arista_version(host: str) -> dict[str, Any]:
+def version(host: str) -> dict[str, Any]:
     """Get EOS version, model, serial, and uptime.
 
     Args:
@@ -53,7 +53,7 @@ def arista_version(host: str) -> dict[str, Any]:
 
 
 @read_tool
-def arista_interfaces(host: str) -> dict[str, Any]:
+def interfaces(host: str) -> dict[str, Any]:
     """Get interface status summary (all interfaces).
 
     Args:
@@ -66,7 +66,7 @@ def arista_interfaces(host: str) -> dict[str, Any]:
 
 
 @read_tool
-def arista_interface_counters(host: str) -> dict[str, Any]:
+def interface_counters(host: str) -> dict[str, Any]:
     """Get interface error counters.
 
     Args:
@@ -82,7 +82,7 @@ def arista_interface_counters(host: str) -> dict[str, Any]:
 
 
 @read_tool
-def arista_vlans(host: str) -> dict[str, Any]:
+def vlans(host: str) -> dict[str, Any]:
     """List all VLANs configured on the switch.
 
     Args:
@@ -95,7 +95,7 @@ def arista_vlans(host: str) -> dict[str, Any]:
 
 
 @read_tool
-def arista_mac_table(
+def mac_table(
     host: str,
     vlan: int | None = None,
 ) -> dict[str, Any]:
@@ -113,7 +113,7 @@ def arista_mac_table(
 
 
 @read_tool
-def arista_lldp(host: str) -> dict[str, Any]:
+def lldp(host: str) -> dict[str, Any]:
     """Get LLDP neighbor information.
 
     Args:
@@ -129,7 +129,7 @@ def arista_lldp(host: str) -> dict[str, Any]:
 
 
 @read_tool
-def arista_arp(
+def arp(
     host: str,
     vrf: str | None = None,
 ) -> dict[str, Any]:
@@ -147,7 +147,7 @@ def arista_arp(
 
 
 @read_tool
-def arista_ip_interfaces(host: str) -> dict[str, Any]:
+def ip_interfaces(host: str) -> dict[str, Any]:
     """Get IP interface brief — interface IPs and status.
 
     Args:
@@ -163,7 +163,7 @@ def arista_ip_interfaces(host: str) -> dict[str, Any]:
 
 
 @read_tool
-def arista_bgp_summary(host: str) -> dict[str, Any]:
+def bgp_summary(host: str) -> dict[str, Any]:
     """Get BGP peer summary.
 
     Args:
@@ -176,7 +176,7 @@ def arista_bgp_summary(host: str) -> dict[str, Any]:
 
 
 @read_tool
-def arista_routes(host: str) -> dict[str, Any]:
+def routes(host: str) -> dict[str, Any]:
     """Get IP routing table summary.
 
     Args:
@@ -192,7 +192,7 @@ def arista_routes(host: str) -> dict[str, Any]:
 
 
 @read_tool
-def arista_config(
+def config(
     host: str,
     section: str | None = None,
 ) -> str:
@@ -216,7 +216,7 @@ def arista_config(
 
 
 @write_tool
-def arista_cmd(
+def cmd(
     host: str,
     command: str,
     fmt: str = "json",
@@ -237,7 +237,7 @@ def arista_cmd(
 
 
 @write_tool
-def arista_multi(
+def multi(
     host: str,
     commands: list[str],
     fmt: str = "json",
@@ -260,14 +260,14 @@ def arista_multi(
 
 
 @destructive_tool
-def arista_configure(
+def configure(
     host: str,
     commands: list[str | dict[str, Any]],
 ) -> str:
     """Apply configuration commands via eAPI session (atomic).
 
     Commands are wrapped in a configure session — all-or-nothing apply.
-    Use 'arista_config' to review the running config before changes.
+    Use 'config' to review the running config before changes.
 
     Args:
         host: Switch IP or hostname.
@@ -275,7 +275,7 @@ def arista_configure(
             An entry may instead be a dict {"cmd": ..., "input": ...} to supply
             multi-line input to commands that prompt for a body, such as
             ``comment`` or ``banner``. Note a bare "!! text" string is rejected
-            by eAPI — use ``arista_comment`` or the dict form.
+            by eAPI — use ``comment`` or the dict form.
 
     Returns:
         A confirmation message with the number of commands applied.
@@ -285,7 +285,7 @@ def arista_configure(
 
 
 @read_tool
-def arista_config_sessions(host: str) -> dict[str, Any]:
+def config_sessions(host: str) -> dict[str, Any]:
     """List configuration sessions on a switch.
 
     Use before configuring to see whether someone is mid-edit. A *pending*
@@ -307,7 +307,7 @@ def arista_config_sessions(host: str) -> dict[str, Any]:
 
 
 @write_tool
-def arista_session_stage(
+def session_stage(
     host: str,
     session: str,
     commands: list[str | dict[str, Any]],
@@ -316,14 +316,14 @@ def arista_session_stage(
 
     The "propose" half of propose -> review -> commit. Creates the session if
     it does not exist, resumes it if already pending. Nothing reaches
-    running-config until `arista_session_commit`. Review first with
-    `arista_session_diff`, or discard with `arista_session_abort`.
+    running-config until `session_commit`. Review first with
+    `session_diff`, or discard with `session_abort`.
 
     Args:
         host: Switch IP or hostname.
         session: Session name. Pick something identifiable, not a shared name.
         commands: Config commands; entries may be dicts carrying multi-line
-            input (see `arista_configure`).
+            input (see `configure`).
 
     Returns:
         A confirmation message.
@@ -331,12 +331,12 @@ def arista_session_stage(
     _client.eapi_session_stage(host, session, commands)
     return (
         f"Staged {len(commands)} commands in session {session!r} on {host} "
-        f"(not committed — review with arista_session_diff)"
+        f"(not committed — review with session_diff)"
     )
 
 
 @read_tool
-def arista_session_diff(host: str, session: str) -> str:
+def session_diff(host: str, session: str) -> str:
     """Show what a pending session would change, as a unified diff.
 
     Args:
@@ -350,12 +350,12 @@ def arista_session_diff(host: str, session: str) -> str:
 
 
 @destructive_tool
-def arista_session_commit(host: str, session: str) -> str:
+def session_commit(host: str, session: str) -> str:
     """Commit a pending session, applying its changes to running-config.
 
     EOS does NOT detect overlapping edits: if another session changed the same
     object, the last commit silently wins with no warning. Review
-    `arista_session_diff` first. Commits are not saved to startup-config —
+    `session_diff` first. Commits are not saved to startup-config —
     follow with `write memory` if the change should survive a reload.
 
     Args:
@@ -370,7 +370,7 @@ def arista_session_commit(host: str, session: str) -> str:
 
 
 @destructive_tool
-def arista_session_abort(host: str, session: str) -> str:
+def session_abort(host: str, session: str) -> str:
     """Discard a session and all of its uncommitted changes.
 
     Args:
@@ -385,7 +385,7 @@ def arista_session_abort(host: str, session: str) -> str:
 
 
 @destructive_tool
-def arista_comment(
+def comment(
     host: str,
     section: str,
     text: str,
@@ -420,7 +420,7 @@ def arista_comment(
 
 
 @destructive_tool
-def arista_ssh(
+def ssh(
     host: str,
     command: str,
 ) -> str:
@@ -443,11 +443,11 @@ def arista_ssh(
 
 
 @read_tool
-def arista_show(host: str, command: str, fmt: str = "json") -> Any:
+def show(host: str, command: str, fmt: str = "json") -> Any:
     """Execute a read-only EOS 'show ...' command via eAPI.
 
-    Refuses any command that is not a show command. Use ``arista_cmd``
-    for non-destructive non-show commands and ``arista_cmd_destructive``
+    Refuses any command that is not a show command. Use ``cmd``
+    for non-destructive non-show commands and ``cmd_destructive``
     for reload/write erase/clear/delete file.
 
     Args:
@@ -463,7 +463,7 @@ def arista_show(host: str, command: str, fmt: str = "json") -> Any:
 
 
 @read_tool
-def arista_show_multi(host: str, commands: list[str], fmt: str = "json") -> list[Any]:
+def show_multi(host: str, commands: list[str], fmt: str = "json") -> list[Any]:
     """Execute multiple read-only EOS show commands in a single eAPI call.
 
     Refuses if any command in the list is not a show command.
@@ -482,11 +482,11 @@ def arista_show_multi(host: str, commands: list[str], fmt: str = "json") -> list
 
 
 @destructive_tool
-def arista_cmd_destructive(host: str, command: str, fmt: str = "json") -> Any:
+def cmd_destructive(host: str, command: str, fmt: str = "json") -> Any:
     """Execute a destructive EOS command (reload, write erase, clear, delete file).
 
-    Refuses anything that is not destructive — use ``arista_cmd`` for
-    write commands and ``arista_show`` for show commands.
+    Refuses anything that is not destructive — use ``cmd`` for
+    write commands and ``show`` for show commands.
 
     Args:
         host: Switch IP or hostname.

@@ -46,7 +46,7 @@ def require_show(cmd: str) -> None:
     if not is_show(cmd):
         raise ToolError(
             f"Command {cmd!r} is not a 'show' command; "
-            f"use arista_cmd or arista_cmd_destructive instead."
+            f"use cmd or cmd_destructive instead."
         )
 
 
@@ -55,7 +55,7 @@ def reject_destructive(cmd: str) -> None:
     if is_destructive(cmd):
         raise ToolError(
             f"Command {cmd!r} is destructive; "
-            f"use arista_cmd_destructive instead."
+            f"use cmd_destructive instead."
         )
 
 
@@ -64,5 +64,5 @@ def require_destructive(cmd: str) -> None:
     if not is_destructive(cmd):
         raise ToolError(
             f"Command {cmd!r} is not destructive; "
-            f"use arista_cmd or arista_show instead."
+            f"use cmd or show instead."
         )
